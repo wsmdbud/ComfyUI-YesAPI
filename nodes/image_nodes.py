@@ -106,7 +106,7 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
         for i in range(1, 15):
             optional[f"image_{i}"] = ("IMAGE",)
         optional["api_key"] = ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"})
-        optional["base_url"] = ("STRING", {"default": "", "multiline": False, "placeholder": "默认 https://yesapi.online"})
+        optional["base_url"] = ("STRING", {"default": "https://yesapi.online", "multiline": False})
 
         return {
             "required": {
@@ -259,7 +259,7 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
                 "image_3": ("IMAGE",),
                 "image_4": ("IMAGE",),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -419,7 +419,7 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
                 "image_3": ("IMAGE",),
                 "image_4": ("IMAGE",),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -611,7 +611,7 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
                 "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 

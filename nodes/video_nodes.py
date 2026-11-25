@@ -92,7 +92,7 @@ class YesAPIVideoGenerate:
                 "audio_url": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：驱动音频直链 (.mp3/.wav)"}),
                 "extra_body_json": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：透传额外 JSON 参数"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 video_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -216,7 +216,7 @@ class YesAPIVideoAsyncSubmit:
                 "audio_url": ("STRING", {"default": "", "multiline": False}),
                 "extra_body_json": ("STRING", {"default": "", "multiline": False}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 video_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -320,7 +320,7 @@ class YesAPIVideoAsyncBatchSubmit:
                 "audio_url": ("STRING", {"default": "", "multiline": False}),
                 "extra_body_json": ("STRING", {"default": "", "multiline": False}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 video_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -451,7 +451,7 @@ class YesAPIVideoQueryTasks:
         return {
             "optional": {
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 video_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             }
         }
 
@@ -532,7 +532,7 @@ class YesAPIVideoGetNext:
             "optional": {
                 "target_task_id": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动下载最早已完成的视频任务"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 video_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             }
         }
 

@@ -91,7 +91,7 @@ class YesAPIImageAsyncSubmit:
         for i in range(1, 15):
             optional[f"image_{i}"] = ("IMAGE",)
         optional["api_key"] = ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"})
-        optional["base_url"] = ("STRING", {"default": "", "multiline": False})
+        optional["base_url"] = ("STRING", {"default": "https://yesapi.online", "multiline": False})
 
         return {
             "required": {
@@ -226,7 +226,7 @@ class YesAPIImageAsyncBatchSubmit:
                 "image_3": ("IMAGE",),
                 "image_4": ("IMAGE",),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -369,7 +369,7 @@ class YesAPIImageAsyncQuery:
             "optional": {
                 "target_task_id": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动下载最早完成的任务（如 任务1）"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             }
         }
 

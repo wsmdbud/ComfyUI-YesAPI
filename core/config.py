@@ -296,14 +296,15 @@ def resolve_api_key(
 
 def resolve_base_url(node_base_url: str = "", config_path: Optional[str] = None) -> str:
     """Normalize base URL by stripping trailing slashes and redundant trailing /v1."""
-    raw = ""
-    if node_base_url and node_base_url.strip():
-        raw = node_base_url.strip()
+    clean_node = (node_base_url or "").strip()
+    if clean_node and clean_node.rstrip("/") not in (DEFAULT_BASE_URL, f"{DEFAULT_BASE_URL}/v1"):
+        raw = clean_node
     else:
         cfg = load_config(config_path)
         raw = (
             str(cfg.get("base_url", "") or "").strip()
             or os.environ.get("YESAPI_BASE_URL", "").strip()
+            or clean_node
             or DEFAULT_BASE_URL
         )
     normalized = raw.rstrip("/")

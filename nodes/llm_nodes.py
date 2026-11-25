@@ -123,7 +123,7 @@ class YesAPILLMChat:
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：填写平台其他模型全名"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -201,7 +201,7 @@ class YesAPIVLMChat:
         for i in range(1, 7):
             optional[f"image_{i}"] = ("IMAGE",)
         optional["api_key"] = ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"})
-        optional["base_url"] = ("STRING", {"default": "", "multiline": False})
+        optional["base_url"] = ("STRING", {"default": "https://yesapi.online", "multiline": False})
 
         return {
             "required": {
@@ -319,7 +319,7 @@ class YesAPILLMWriter:
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -419,7 +419,7 @@ class YesAPILLMBatchCSV:
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 
@@ -557,7 +557,7 @@ class YesAPIModelList:
             },
             "optional": {
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取对应分类的 config.json Key"}),
-                "base_url": ("STRING", {"default": "", "multiline": False}),
+                "base_url": ("STRING", {"default": "https://yesapi.online", "multiline": False}),
             },
         }
 

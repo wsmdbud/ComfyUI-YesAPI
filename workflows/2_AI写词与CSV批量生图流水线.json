@@ -7,18 +7,40 @@
     {
       "id": 1,
       "type": "YesAPILLMWriter",
-      "pos": [60, 120],
-      "size": [420, 380],
+      "pos": [
+        60,
+        120
+      ],
+      "size": [
+        420,
+        380
+      ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [],
       "outputs": [
-        {"name": "file_path", "type": "STRING", "links": [1]},
-        {"name": "prompts_preview", "type": "STRING", "links": null},
-        {"name": "status", "type": "STRING", "links": null}
+        {
+          "name": "file_path",
+          "type": "STRING",
+          "links": [
+            1
+          ]
+        },
+        {
+          "name": "prompts_preview",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
+        }
       ],
-      "properties": {"Node name for S&R": "YesAPILLMWriter"},
+      "properties": {
+        "Node name for S&R": "YesAPILLMWriter"
+      },
       "widgets_values": [
         "[Gemini] gemini-3.8-flash",
         "auto",
@@ -28,26 +50,58 @@
         "prompt",
         "",
         "",
-        ""
+        "https://yesapi.online"
       ]
     },
     {
       "id": 2,
       "type": "YesAPIImageSaveWithPrompt",
-      "pos": [540, 100],
-      "size": [440, 480],
+      "pos": [
+        540,
+        100
+      ],
+      "size": [
+        440,
+        480
+      ],
       "flags": {},
       "order": 1,
       "mode": 0,
       "inputs": [
-        {"name": "file_path", "type": "STRING", "widget": {"name": "file_path"}, "link": 1}
+        {
+          "name": "file_path",
+          "type": "STRING",
+          "widget": {
+            "name": "file_path"
+          },
+          "link": 1
+        }
       ],
       "outputs": [
-        {"name": "image", "type": "IMAGE", "links": [2, 3]},
-        {"name": "status", "type": "STRING", "links": null},
-        {"name": "filenames", "type": "STRING", "links": [4]}
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            2,
+            3
+          ]
+        },
+        {
+          "name": "status",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "name": "filenames",
+          "type": "STRING",
+          "links": [
+            4
+          ]
+        }
       ],
-      "properties": {"Node name for S&R": "YesAPIImageSaveWithPrompt"},
+      "properties": {
+        "Node name for S&R": "YesAPIImageSaveWithPrompt"
+      },
       "widgets_values": [
         "",
         "prompt",
@@ -65,46 +119,109 @@
         "",
         "",
         "",
-        ""
+        "https://yesapi.online"
       ]
     },
     {
       "id": 3,
       "type": "PreviewImage",
-      "pos": [1040, 100],
-      "size": [300, 280],
+      "pos": [
+        1040,
+        100
+      ],
+      "size": [
+        300,
+        280
+      ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "inputs": [
-        {"name": "images", "type": "IMAGE", "link": 2}
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 2
+        }
       ],
       "outputs": [],
-      "properties": {"Node name for S&R": "PreviewImage"},
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      },
       "widgets_values": []
     },
     {
       "id": 4,
       "type": "YesAPISaveImageByFilename",
-      "pos": [1040, 420],
-      "size": [320, 200],
+      "pos": [
+        1040,
+        420
+      ],
+      "size": [
+        320,
+        200
+      ],
       "flags": {},
       "order": 3,
       "mode": 4,
       "inputs": [
-        {"name": "images", "type": "IMAGE", "link": 3},
-        {"name": "filenames", "type": "STRING", "widget": {"name": "filenames"}, "link": 4}
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 3
+        },
+        {
+          "name": "filenames",
+          "type": "STRING",
+          "widget": {
+            "name": "filenames"
+          },
+          "link": 4
+        }
       ],
       "outputs": [],
-      "properties": {"Node name for S&R": "YesAPISaveImageByFilename"},
-      "widgets_values": ["", "upscaled", "_copy"]
+      "properties": {
+        "Node name for S&R": "YesAPISaveImageByFilename"
+      },
+      "widgets_values": [
+        "",
+        "upscaled",
+        "_copy"
+      ]
     }
   ],
   "links": [
-    [1, 1, 0, 2, 0, "STRING"],
-    [2, 2, 0, 3, 0, "IMAGE"],
-    [3, 2, 0, 4, 0, "IMAGE"],
-    [4, 2, 2, 4, 1, "STRING"]
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "STRING"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      2,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      4,
+      2,
+      2,
+      4,
+      1,
+      "STRING"
+    ]
   ],
   "groups": [],
   "config": {},

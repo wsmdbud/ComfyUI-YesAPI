@@ -105,3 +105,18 @@ def test_no_node_mixes_aspect_ratio_and_resolution_in_single_dropdown():
                     assert not (has_ratio and has_res_or_px), (
                         f"{node_key}.{param_name} mixes aspect ratios and resolutions: {opts}"
                     )
+
+
+def test_all_nodes_prefill_default_yesapi_base_url():
+    from core.config import DEFAULT_BASE_URL
+    count = 0
+    for node_key, cls in root_pkg.NODE_CLASS_MAPPINGS.items():
+        it = cls.INPUT_TYPES()
+        for sec in ("required", "optional"):
+            if "base_url" in it.get(sec, {}):
+                count += 1
+                meta = it[sec]["base_url"][1]
+                assert meta.get("default") == DEFAULT_BASE_URL, (
+                    f"{node_key}.base_url default is {meta.get('default')!r}, expected {DEFAULT_BASE_URL!r}"
+                )
+    assert count == 18
