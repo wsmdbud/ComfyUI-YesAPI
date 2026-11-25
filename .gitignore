@@ -1,0 +1,28 @@
+# Secrets & local user configuration (NEVER commit!)
+config.json
+.env
+*.key
+
+# Runtime task state & outputs
+*task_history*.json
+yesapi_*_tasks.json
+output/
+temp/
+*.log
+
+# Python bytecode & test caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

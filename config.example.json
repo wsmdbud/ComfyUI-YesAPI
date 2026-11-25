@@ -1,0 +1,8 @@
+{
+  "base_url": "https://yesapi.online",
+  "default_api_key": "",
+  "image_api_key": "",
+  "llm_api_key": "",
+  "video_api_key": "",
+  "timeout_seconds": 180
+}
