@@ -20,7 +20,7 @@
       ],
       "properties": {"Node name for S&R": "YesAPILLMWriter"},
       "widgets_values": [
-        "gemini-3.8-flash",
+        "[Gemini] gemini-3.8-flash",
         "auto",
         "请为我生成 5 条关于“夏日海边咖啡馆”的高细节绘画提示词，仅输出 JSON 字符串数组。",
         "你是一名专业的 AI 绘画提示词专家。请严格只输出一个 JSON 字符串数组，不要输出任何额外解释。",

@@ -18,6 +18,7 @@ try:
     from ..core.config import (
         LLM_MODELS,
         clean_user_path,
+        model_family,
         resolve_api_key,
         resolve_base_url,
         resolve_model,
@@ -30,6 +31,7 @@ except ImportError:
     from core.config import (
         LLM_MODELS,
         clean_user_path,
+        model_family,
         resolve_api_key,
         resolve_base_url,
         resolve_model,
@@ -110,7 +112,7 @@ class YesAPILLMChat:
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {
             "required": {
-                "model": (LLM_MODELS, {"default": "gemini-4-carbon"}),
+                "model": (LLM_MODELS, {"default": "[Gemini] gemini-4-carbon"}),
                 "protocol": (PROTOCOLS, {"default": "auto"}),
                 "system_prompt": ("STRING", {"default": "You are a helpful assistant.", "multiline": True}),
                 "prompt": ("STRING", {"default": "你好，请介绍一下你自己。", "multiline": True}),
@@ -120,7 +122,7 @@ class YesAPILLMChat:
             },
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：填写平台其他模型全名"}),
-                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 llm_api_key"}),
+                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
                 "base_url": ("STRING", {"default": "", "multiline": False}),
             },
         }
@@ -149,17 +151,19 @@ class YesAPILLMChat:
             err = "失败: prompt 不能为空。"
             return {"ui": {"string": [err]}, "result": ("", err)}
 
-        final_key = resolve_api_key(api_key, category="llm")
+        raw_selector = custom_model.strip() if (custom_model and custom_model.strip()) else model
+        final_model = resolve_model(model, custom_model)
+        fam = model_family(raw_selector) or "llm"
+        final_key = resolve_api_key(api_key, category="llm", model=raw_selector)
         if not final_key:
-            err = "失败: API Key 不能为空。请在节点填入 api_key 或在 config.json 中配置 llm_api_key。"
+            err = f"失败: API Key 不能为空。请在节点填入 api_key 或在 config.json 中配置 {fam}_api_key / llm_api_key。"
             return {"ui": {"string": [err]}, "result": ("", err)}
 
-        final_model = resolve_model(model, custom_model)
         try:
             client = YesAPIClient(
                 api_key=final_key,
                 base_url=resolve_base_url(base_url),
-                category="llm",
+                category=fam,
                 timeout=resolve_timeout(),
             )
             reply = client.chat_completion(
@@ -196,12 +200,12 @@ class YesAPIVLMChat:
         }
         for i in range(1, 7):
             optional[f"image_{i}"] = ("IMAGE",)
-        optional["api_key"] = ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 llm_api_key"})
+        optional["api_key"] = ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"})
         optional["base_url"] = ("STRING", {"default": "", "multiline": False})
 
         return {
             "required": {
-                "model": (LLM_MODELS, {"default": "gemini-4-carbon"}),
+                "model": (LLM_MODELS, {"default": "[Gemini] gemini-4-carbon"}),
                 "protocol": (PROTOCOLS, {"default": "auto"}),
                 "system_prompt": ("STRING", {"default": "You are an expert visual analyst and prompt engineer.", "multiline": True}),
                 "prompt": ("STRING", {"default": "请详细描述画面内容、构图与光影风格。", "multiline": True}),
@@ -237,9 +241,12 @@ class YesAPIVLMChat:
             err = "失败: prompt 不能为空。"
             return {"ui": {"string": [err]}, "result": ("", err)}
 
-        final_key = resolve_api_key(api_key, category="llm")
+        raw_selector = custom_model.strip() if (custom_model and custom_model.strip()) else model
+        final_model = resolve_model(model, custom_model)
+        fam = model_family(raw_selector) or "llm"
+        final_key = resolve_api_key(api_key, category="llm", model=raw_selector)
         if not final_key:
-            err = "失败: API Key 不能为空。请配置 llm_api_key 或在节点填入。"
+            err = f"失败: API Key 不能为空。请配置 {fam}_api_key / llm_api_key 或在节点填入。"
             return {"ui": {"string": [err]}, "result": ("", err)}
 
         pils: List[Image.Image] = []
@@ -248,12 +255,11 @@ class YesAPIVLMChat:
             if t is not None:
                 pils.extend(tensor_to_pil(t))
 
-        final_model = resolve_model(model, custom_model)
         try:
             client = YesAPIClient(
                 api_key=final_key,
                 base_url=resolve_base_url(base_url),
-                category="llm",
+                category=fam,
                 timeout=resolve_timeout(),
             )
             reply = client.chat_completion(
@@ -288,7 +294,7 @@ class YesAPILLMWriter:
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {
             "required": {
-                "model": (LLM_MODELS, {"default": "gemini-3.8-flash"}),
+                "model": (LLM_MODELS, {"default": "[Gemini] gemini-3.8-flash"}),
                 "protocol": (PROTOCOLS, {"default": "auto"}),
                 "main_prompt": (
                     "STRING",
@@ -312,7 +318,7 @@ class YesAPILLMWriter:
                 "image_1": ("IMAGE",),
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
-                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 llm_api_key"}),
+                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
                 "base_url": ("STRING", {"default": "", "multiline": False}),
             },
         }
@@ -334,9 +340,12 @@ class YesAPILLMWriter:
         base_url: str = "",
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        final_key = resolve_api_key(api_key, category="llm")
+        raw_selector = custom_model.strip() if (custom_model and custom_model.strip()) else model
+        final_model = resolve_model(model, custom_model)
+        fam = model_family(raw_selector) or "llm"
+        final_key = resolve_api_key(api_key, category="llm", model=raw_selector)
         if not final_key:
-            err = "失败: API Key 不能为空。请配置 llm_api_key 或在节点填入。"
+            err = f"失败: API Key 不能为空。请配置 {fam}_api_key / llm_api_key 或在节点填入。"
             return {"ui": {"string": [err]}, "result": ("", "", err)}
 
         fname = (output_filename or "generated_prompts.csv").strip()
@@ -350,12 +359,11 @@ class YesAPILLMWriter:
             if t is not None:
                 pils.extend(tensor_to_pil(t))
 
-        final_model = resolve_model(model, custom_model)
         try:
             client = YesAPIClient(
                 api_key=final_key,
                 base_url=resolve_base_url(base_url),
-                category="llm",
+                category=fam,
                 timeout=resolve_timeout(),
             )
             raw_reply = client.chat_completion(
@@ -402,7 +410,7 @@ class YesAPILLMBatchCSV:
                 "output_column": ("STRING", {"default": "llm_output"}),
                 "system_prompt": ("STRING", {"default": "You are a helpful assistant.", "multiline": True}),
                 "prompt_template": ("STRING", {"default": "请将以下内容扩写为英文绘画提示词：\n{text}", "multiline": True}),
-                "model": (LLM_MODELS, {"default": "gemini-3.8-flash"}),
+                "model": (LLM_MODELS, {"default": "[Gemini] gemini-3.8-flash"}),
                 "protocol": (PROTOCOLS, {"default": "auto"}),
                 "concurrency": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
                 "max_count": ("INT", {"default": 100, "min": 1, "max": 1000, "step": 1}),
@@ -410,7 +418,7 @@ class YesAPILLMBatchCSV:
             },
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
-                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 llm_api_key"}),
+                "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则自动按模型读取对应分组 Key"}),
                 "base_url": ("STRING", {"default": "", "multiline": False}),
             },
         }
@@ -435,9 +443,12 @@ class YesAPILLMBatchCSV:
         api_key: str = "",
         base_url: str = "",
     ) -> Dict[str, Any]:
-        final_key = resolve_api_key(api_key, category="llm")
+        raw_selector = custom_model.strip() if (custom_model and custom_model.strip()) else model
+        final_model = resolve_model(model, custom_model)
+        fam = model_family(raw_selector) or "llm"
+        final_key = resolve_api_key(api_key, category="llm", model=raw_selector)
         if not final_key:
-            err = "失败: API Key 不能为空。"
+            err = f"失败: API Key 不能为空。请配置 {fam}_api_key / llm_api_key 或在节点填入。"
             return {"ui": {"string": [err]}, "result": ("", err)}
 
         try:
@@ -453,13 +464,11 @@ class YesAPILLMBatchCSV:
 
         work_df = df.head(max(1, int(max_count))).copy()
         texts = [str(v) if pd.notna(v) else "" for v in work_df[in_col].tolist()]
-        final_model = resolve_model(model, custom_model)
-
         try:
             client = YesAPIClient(
                 api_key=final_key,
                 base_url=resolve_base_url(base_url),
-                category="llm",
+                category=fam,
                 timeout=resolve_timeout(),
             )
         except Exception as e:
@@ -543,7 +552,7 @@ class YesAPIModelList:
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {
             "required": {
-                "key_category": (["llm", "image", "video", "default"], {"default": "llm"}),
+                "key_category": (["llm", "gemini", "gemini_vt", "openai", "claude", "cn", "image", "video", "default"], {"default": "llm"}),
                 "keyword_filter": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：按关键字过滤（如 banana / gemini / veo）"}),
             },
             "optional": {

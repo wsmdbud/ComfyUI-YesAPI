@@ -1,4 +1,4 @@
-"""Synchronous and batch image generation & editing nodes for ComfyUI-YesAPI (5 nodes)."""
+"""Synchronous and batch image generation & editing nodes for ComfyUI-YesAPI (6 nodes)."""
 from __future__ import annotations
 
 import concurrent.futures
@@ -212,6 +212,22 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
         if all_errors:
             status += f" | 首条错误: {all_errors[0]}"
         return {"ui": {"string": [status]}, "result": (safe_pil_batch_to_tensor(all_images), status)}
+
+
+class YesAPIImageText2Image(YesAPIImageGenerate):
+    """Text-to-image node with no reference-image or mask sockets."""
+
+    @classmethod
+    def INPUT_TYPES(cls) -> Dict[str, Any]:
+        inputs = YesAPIImageGenerate.INPUT_TYPES()
+        optional = inputs["optional"]
+        return {
+            "required": inputs["required"],
+            "optional": {
+                key: optional[key]
+                for key in ("custom_model", "custom_size", "api_key", "base_url")
+            },
+        }
 
 
 # ==================== Node 2: YesAPIImageBatchCSV ====================
@@ -892,6 +908,7 @@ class YesAPISaveImageByFilename:
 
 NODE_CLASS_MAPPINGS = {
     "YesAPIImageGenerate": YesAPIImageGenerate,
+    "YesAPIImageText2Image": YesAPIImageText2Image,
     "YesAPIImageBatchCSV": YesAPIImageBatchCSV,
     "YesAPIImageSaveWithPrompt": YesAPIImageSaveWithPrompt,
     "YesAPIImageBatchDir": YesAPIImageBatchDir,
@@ -900,6 +917,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "YesAPIImageGenerate": "🎨 YesAPI 图像生成与编辑",
+    "YesAPIImageText2Image": "🎨 YesAPI 纯文生图",
     "YesAPIImageBatchCSV": "📊 YesAPI 图像批量生成 (CSV/Excel)",
     "YesAPIImageSaveWithPrompt": "🏷️ YesAPI 图像批量生成 (命名细化版)",
     "YesAPIImageBatchDir": "📂 YesAPI 文件夹批量处理 (CSV)",

@@ -8,6 +8,9 @@ from core.compat import get_output_directory, get_temp_directory, ProgressBar, V
 from core.config import (
     IMAGE_ASPECT_RATIOS,
     IMAGE_RESOLUTIONS,
+    LLM_MODELS,
+    model_family,
+    strip_model_label,
     resolve_api_key,
     resolve_base_url,
     resolve_image_size,
@@ -62,6 +65,75 @@ def test_resolve_model_and_clean_user_path():
     assert clean_user_path("  'D:/imgs/a.png' ") == "D:/imgs/a.png"
 
 
+def test_llm_catalog_has_group_labels_and_unique_ids():
+    assert "[Gemini] gemini-4-carbon" in LLM_MODELS
+    assert "[Gemini] gemini-4-neon" in LLM_MODELS
+    assert "[Gemini-VT] gemini-3.1-pro-preview" in LLM_MODELS
+    assert "[ChatGPT] codex-auto-review" in LLM_MODELS
+    assert "[Claude] claude-fable-5-2" in LLM_MODELS
+    assert "[国模CN] deepseek-v4.1-flash" in LLM_MODELS
+    ids = [strip_model_label(m) for m in LLM_MODELS]
+    assert len(ids) == len(set(ids))
+    assert all(not i.startswith("[") for i in ids)
+    assert "claude-fable-5.2" not in ids  # does not exist on model plaza
+    assert len(ids) >= 40
+    assert resolve_model("[Claude] claude-opus-5.5", "") == "claude-opus-5.5"
+    assert resolve_model("[Claude] claude-opus-5.5", " my-new-model ") == "my-new-model"
+
+
+def test_model_family_detection():
+    assert model_family("gemini-4-carbon") == "gemini"
+    assert model_family("gemini-3.1-pro-preview") == "gemini_vt"
+    assert model_family("gemini-3.7-flash") == "gemini_vt"
+    assert model_family("gemini-3.6-flash") == "gemini_vt"
+    assert model_family("gemini-3.1-flash-lite-preview") == "gemini_vt"
+    assert model_family("[Gemini-VT] gemini-3.8-flash") == "gemini_vt"
+    assert model_family("[Gemini] gemini-3.8-flash") == "gemini"
+    assert model_family("gpt-6.2-sol") == "openai"
+    assert model_family("codex-auto-review") == "openai"
+    assert model_family("claude-sonnet-9") == "claude"  # prefix fallback for future models
+    assert model_family("kimi-k9") == "cn"
+    assert model_family("glm-6") == "cn"
+    assert model_family("mystery-x") is None
+
+
+def test_llm_key_routes_by_model_group(tmp_path, monkeypatch):
+    for env in (
+        "YESAPI_API_KEY", "YESAPI_LLM_KEY", "YESAPI_GEMINI_KEY", "YESAPI_GEMINI_VT_KEY",
+        "YESAPI_OPENAI_KEY", "YESAPI_CLAUDE_KEY", "YESAPI_CN_KEY",
+    ):
+        monkeypatch.delenv(env, raising=False)
+    cfg_file = tmp_path / "config.json"
+    cfg_file.write_text(
+        json.dumps(
+            {
+                "llm_api_key": "sk-llm-generic",
+                "gemini_api_key": "sk-gem",
+                "gemini_vt_api_key": "",
+                "openai_api_key": "sk-gpt",
+                "claude_api_key": "sk-cla",
+                "cn_api_key": "sk-cn",
+            }
+        ),
+        encoding="utf-8",
+    )
+    cp = str(cfg_file)
+    assert resolve_api_key("", category="llm", model="gemini-4-carbon", config_path=cp) == "sk-gem"
+    assert resolve_api_key("", category="llm", model="gpt-6", config_path=cp) == "sk-gpt"
+    assert resolve_api_key("", category="llm", model="claude-opus-5.5", config_path=cp) == "sk-cla"
+    assert resolve_api_key("", category="llm", model="deepseek-v4-pro", config_path=cp) == "sk-cn"
+    # Unknown model falls back to generic llm_api_key
+    assert resolve_api_key("", category="llm", model="mystery-x", config_path=cp) == "sk-llm-generic"
+    # Gemini-VT model falls back to gemini key when VT key is empty
+    assert resolve_api_key("", category="llm", model="gemini-3.1-pro-preview", config_path=cp) == "sk-gem"
+    monkeypatch.setenv("YESAPI_GEMINI_VT_KEY", "sk-vt-env")
+    assert resolve_api_key("", category="llm", model="gemini-3.1-pro-preview", config_path=cp) == "sk-vt-env"
+    # Node input still wins
+    assert resolve_api_key("sk-node", category="llm", model="gpt-6", config_path=cp) == "sk-node"
+    # Group name usable directly as category (for model list node)
+    assert resolve_api_key("", category="claude", config_path=cp) == "sk-cla"
+
+
 def test_aspect_ratio_and_resolution_are_strictly_separated():
     # Aspect ratios must NEVER contain resolution tiers or WxH pixels
     for ar in IMAGE_ASPECT_RATIOS:
@@ -93,6 +165,10 @@ def test_format_yesapi_error_classifies_fatal_and_adds_hints():
 
     msg3, fatal3 = format_yesapi_error("upstream timeout", status_code=504, category="image")
     assert fatal3 is False
+
+    msg4, fatal4 = format_yesapi_error("Unauthorized", status_code=401, category="claude")
+    assert fatal4 is True
+    assert "claude_api_key" in msg4
 
 
 def test_json_task_store_thread_safe_numbering_and_trimming(tmp_path):

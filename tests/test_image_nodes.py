@@ -10,6 +10,7 @@ from nodes.image_nodes import (
     YesAPIImageBatchCSV,
     YesAPIImageBatchDir,
     YesAPIImageGenerate,
+    YesAPIImageText2Image,
     YesAPIImageSaveWithPrompt,
     YesAPISaveImageByFilename,
 )
@@ -41,6 +42,35 @@ def test_all_image_nodes_separate_aspect_ratio_and_resolution():
             assert opt not in ("1K", "2K", "4K", "1024x1024", "3840x2160")
         for opt in req["resolution"][0]:
             assert ":" not in opt
+
+
+def test_text2image_node_has_no_image_slots_and_generates():
+    it = YesAPIImageText2Image.INPUT_TYPES()
+    all_keys = set(it["required"]) | set(it.get("optional", {}))
+    assert not any(k.startswith("image_") for k in all_keys)
+    assert "mask" not in all_keys
+    assert "aspect_ratio" in it["required"] and "resolution" in it["required"]
+
+    fake_client = MagicMock()
+    fake_client.generate_images.return_value = [Image.new("RGB", (64, 36), (10, 10, 10))]
+    with patch("nodes.image_nodes.YesAPIClient", return_value=fake_client):
+        res = YesAPIImageText2Image().execute(
+            prompt="sunset",
+            model="gpt-image-2",
+            aspect_ratio="16:9",
+            resolution="1K",
+            quality="auto",
+            concurrency=1,
+            random_mode="固定",
+            api_key="sk-img",
+        )
+    out, status = res["result"]
+    assert out.shape == (1, 36, 64, 3)
+    assert "文生图" in status
+    kw = fake_client.generate_images.call_args.kwargs
+    assert kw["ref_images"] == []
+    assert kw["mask_png_bytes"] is None
+    assert kw["size"] == "1920x1080"
 
 
 def test_image_generate_sync_and_mask_validation(monkeypatch):

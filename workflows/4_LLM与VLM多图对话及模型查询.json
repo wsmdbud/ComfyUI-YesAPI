@@ -19,7 +19,7 @@
       ],
       "properties": {"Node name for S&R": "YesAPILLMChat"},
       "widgets_values": [
-        "gemini-4-carbon",
+        "[Gemini] gemini-4-carbon",
         "auto",
         "You are a helpful assistant.",
         "请用三句话写一个科幻微小说开头。",
@@ -64,7 +64,7 @@
       ],
       "properties": {"Node name for S&R": "YesAPIVLMChat"},
       "widgets_values": [
-        "gemini-4-carbon",
+        "[Gemini] gemini-4-carbon",
         "auto",
         "You are an expert visual prompt engineer.",
         "请反推这张图片的详细英文绘画提示词。",
@@ -112,7 +112,7 @@
         "en_prompt",
         "You are a professional translator.",
         "将以下中文提示词扩写并翻译为英文：\n{text}",
-        "gemini-3.8-flash",
+        "[Gemini] gemini-3.8-flash",
         "auto",
         3,
         100,

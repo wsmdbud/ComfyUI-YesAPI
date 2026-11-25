@@ -3,6 +3,11 @@
   "default_api_key": "",
   "image_api_key": "",
   "llm_api_key": "",
+  "gemini_api_key": "",
+  "gemini_vt_api_key": "",
+  "openai_api_key": "",
+  "claude_api_key": "",
+  "cn_api_key": "",
   "video_api_key": "",
   "timeout_seconds": 180
 }

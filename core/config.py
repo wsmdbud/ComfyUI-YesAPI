@@ -105,27 +105,53 @@ ASPECT_RESOLUTION_MAP: Dict[str, Dict[str, str]] = {
 
 IMAGE_QUALITIES = ["auto", "high", "medium", "low"]
 
-# Synced from https://yesapi.online/model-plaza across Gemini / ChatGPT / Claude / 国模聚合CN groups
+# Synced from the public Yesapi model-plaza catalog. The Gemini-VT preview model
+# is retained from the documented model-group example when absent from the catalog.
 LLM_MODELS = [
-    "gemini-4-carbon",
-    "gemini-4-argon",
-    "gemini-4-hydrogen",
-    "gemini-3.8-flash",
-    "gemini-3.1-pro-preview",
-    "gpt-6",
-    "gpt-6-astra",
-    "gpt-6.2-astra",
-    "gpt-5.6-sol",
-    "claude-sonnet-5.5",
-    "claude-opus-5.5",
-    "claude-fable-5.2",
-    "claude-haiku-4-5-20251001",
-    "deepseek-v4.1-flash",
-    "deepseek-v4-pro",
-    "kimi-k3.1-pro",
-    "kimi-k3",
-    "glm-5.3",
-    "glm-5.3-flash",
+    "[Gemini] gemini-3.8-flash",
+    "[Gemini] gemini-4-argon",
+    "[Gemini] gemini-4-carbon",
+    "[Gemini] gemini-4-hydrogen",
+    "[Gemini] gemini-4-neon",
+    "[Gemini-VT] gemini-3.1-pro-preview",
+    "[Gemini-VT] gemini-3.1-flash-lite-preview",
+    "[Gemini-VT] gemini-3.7-flash",
+    "[Gemini-VT] gemini-3.6-flash",
+    "[ChatGPT] codex-auto-review",
+    "[ChatGPT] gpt-5.6-luna",
+    "[ChatGPT] gpt-5.6-sol",
+    "[ChatGPT] gpt-5.6-terra",
+    "[ChatGPT] gpt-6",
+    "[ChatGPT] gpt-6-astra",
+    "[ChatGPT] gpt-6-luna",
+    "[ChatGPT] gpt-6-sol",
+    "[ChatGPT] gpt-6.1-sol",
+    "[ChatGPT] gpt-6.2-astra",
+    "[ChatGPT] gpt-6.2-sol",
+    "[Claude] claude-fable-5",
+    "[Claude] claude-fable-5-1",
+    "[Claude] claude-fable-5-2",
+    "[Claude] claude-fable-5.1",
+    "[Claude] claude-haiku-4-5-20251001",
+    "[Claude] claude-opus-4-6",
+    "[Claude] claude-opus-4-7",
+    "[Claude] claude-opus-4-8",
+    "[Claude] claude-opus-4.6",
+    "[Claude] claude-opus-5",
+    "[Claude] claude-opus-5-5",
+    "[Claude] claude-opus-5.5",
+    "[Claude] claude-sonnet-4-6",
+    "[Claude] claude-sonnet-5",
+    "[Claude] claude-sonnet-5-5",
+    "[Claude] claude-sonnet-5.5",
+    "[国模CN] deepseek-v4-pro",
+    "[国模CN] deepseek-v4-pro-0813",
+    "[国模CN] deepseek-v4.1-flash",
+    "[国模CN] deepseek-v4.1-flash-1017",
+    "[国模CN] glm-5.3",
+    "[国模CN] glm-5.3-flash",
+    "[国模CN] kimi-k3",
+    "[国模CN] kimi-k3.1-pro",
 ]
 
 # Synced from https://yesapi.online/guide (视频生成)
@@ -183,24 +209,71 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         return {}
 
 
+def strip_model_label(model: str) -> str:
+    """Remove the display-only group prefix from a model dropdown value."""
+    return re.sub(r"^\[[^\]]+\]\s*", "", (model or "").strip()).strip()
+
+
+def model_family(model: str) -> Optional[str]:
+    """Map known model IDs (or group-prefixed labels) to the Yesapi key group."""
+    raw = (model or "").strip()
+    if raw.startswith("[Gemini-VT]"):
+        return "gemini_vt"
+    if raw.startswith("[Gemini]"):
+        return "gemini"
+    if raw.startswith("[ChatGPT]"):
+        return "openai"
+    if raw.startswith("[Claude]"):
+        return "claude"
+    if raw.startswith("[国模CN]"):
+        return "cn"
+
+    model_id = strip_model_label(raw).lower()
+    if model_id.startswith(("gemini-3.1-", "gemini-3.6-", "gemini-3.7-")):
+        return "gemini_vt"
+    if model_id.startswith("gemini-"):
+        return "gemini"
+    if model_id.startswith(("gpt-", "codex-")):
+        return "openai"
+    if model_id.startswith("claude-"):
+        return "claude"
+    if model_id.startswith(("deepseek-", "kimi-", "glm-")):
+        return "cn"
+    return None
+
+
 def resolve_api_key(
     node_api_key: str = "",
     category: str = "default",
     config_path: Optional[str] = None,
+    model: str = "",
 ) -> str:
     """
     Resolve API key in strict priority order:
     1. Non-empty node_api_key widget input
-    2. Category-specific key in config.json (image_api_key / llm_api_key / video_api_key)
-    3. Category-specific environment variable (YESAPI_IMAGE_KEY / YESAPI_LLM_KEY / YESAPI_VIDEO_KEY)
-    4. default_api_key in config.json
-    5. YESAPI_API_KEY environment variable
+    LLM family-specific config/environment keys precede the generic LLM key.
+    Gemini-VT can override its Gemini fallback with a dedicated key.
     """
     if node_api_key and node_api_key.strip():
         return node_api_key.strip()
 
     cfg = load_config(config_path)
     cat = (category or "default").strip().lower()
+
+    family = model_family(model) if cat == "llm" else (cat if cat in {"gemini", "gemini_vt", "openai", "claude", "cn"} else None)
+    family_chain = [family] if family else []
+    if family == "gemini_vt":
+        family_chain.append("gemini")
+    elif family == "gemini":
+        family_chain.append("gemini_vt")
+
+    for item in family_chain:
+        cfg_group_val = str(cfg.get(f"{item}_api_key", "") or "").strip()
+        if cfg_group_val:
+            return cfg_group_val
+        env_group_val = os.environ.get(f"YESAPI_{item.upper()}_KEY", "").strip()
+        if env_group_val:
+            return env_group_val
 
     if cat in ("image", "llm", "video"):
         cfg_cat_val = str(cfg.get(f"{cat}_api_key", "") or "").strip()
@@ -251,8 +324,8 @@ def resolve_timeout(config_path: Optional[str] = None, default: int = DEFAULT_TI
 def resolve_model(selected_model: str, custom_model: str = "") -> str:
     """Prefer custom_model when non-empty; otherwise use dropdown selection."""
     if custom_model and custom_model.strip():
-        return custom_model.strip()
-    return (selected_model or "").strip()
+        return strip_model_label(custom_model)
+    return strip_model_label(selected_model)
 
 
 def clean_user_path(raw_path: str) -> str:
@@ -277,9 +350,11 @@ def format_yesapi_error(
     Format raw API error into an actionable Chinese message and return (message, is_fatal).
     is_fatal=True signals batch nodes to trip the circuit breaker immediately.
     """
+    VALID_KEY_CATEGORIES = {"image", "llm", "video", "gemini", "gemini_vt", "openai", "claude", "cn"}
     text = (error_text or "未知错误").strip()
     lower = text.lower()
-    cat_key_hint = f"{category}_api_key" if category in ("image", "llm", "video") else "default_api_key"
+    cat_clean = (category or "default").strip().lower()
+    cat_key_hint = f"{cat_clean}_api_key" if cat_clean in VALID_KEY_CATEGORIES else "default_api_key"
 
     if status_code == 402 or "api_key_quota_exhausted" in lower or "insufficient_quota" in lower or "quota" in lower:
         return (

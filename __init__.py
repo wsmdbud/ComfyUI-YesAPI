@@ -1,6 +1,6 @@
 """
 ComfyUI-YesAPI: Full-featured ComfyUI custom node suite for https://yesapi.online
-Includes 18 nodes across Image Generation/Editing, Async Image Queue, Dual-Protocol LLM/VLM, and Video Generation.
+Includes 19 nodes across Image Generation/Editing, Async Image Queue, Dual-Protocol LLM/VLM, and Video Generation.
 """
 from __future__ import annotations
 

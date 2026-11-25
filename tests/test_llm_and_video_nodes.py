@@ -73,6 +73,39 @@ def test_llm_chat_vlm_chat_and_model_list():
         assert "2 个" in m_status
 
 
+def test_llm_nodes_route_key_by_model_group(tmp_path, monkeypatch):
+    for env in ("YESAPI_API_KEY", "YESAPI_LLM_KEY", "YESAPI_CLAUDE_KEY", "YESAPI_CN_KEY"):
+        monkeypatch.delenv(env, raising=False)
+    cfg = tmp_path / "config.json"
+    cfg.write_text(
+        '{"llm_api_key": "sk-generic", "claude_api_key": "sk-cla", "cn_api_key": "sk-cn"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("YESAPI_CONFIG_PATH", str(cfg))
+
+    # Dropdown defaults carry group labels
+    assert YesAPILLMChat.INPUT_TYPES()["required"]["model"][1]["default"].startswith("[")
+
+    captured = []
+
+    def _fake_ctor(**kwargs):
+        captured.append(kwargs["api_key"])
+        c = MagicMock()
+        c.chat_completion.return_value = "ok"
+        return c
+
+    with patch("nodes.llm_nodes.YesAPIClient", side_effect=_fake_ctor):
+        r1 = YesAPILLMChat().execute(
+            model="[Claude] claude-sonnet-5.5", protocol="auto", system_prompt="", prompt="hi",
+        )
+        r2 = YesAPIVLMChat().execute(
+            model="[国模CN] kimi-k3", protocol="auto", system_prompt="", prompt="hi",
+        )
+    assert captured == ["sk-cla", "sk-cn"]
+    assert "claude-sonnet-5.5" in r1["result"][1]
+    assert "[" not in r1["result"][1].split("模型: ")[1]
+
+
 def test_llm_writer_and_llm_batch_csv(tmp_path, monkeypatch):
     monkeypatch.setenv("COMFYUI_OUTPUT_DIR", str(tmp_path / "out"))
     fake_client = MagicMock()
@@ -215,7 +248,7 @@ def test_video_sync_and_async_queue_nodes(tmp_path, monkeypatch):
         assert "下载成功" in dl_report
 
 
-def test_comfyui_hyphenated_package_loader_registers_all_18_nodes():
+def test_comfyui_hyphenated_package_loader_registers_all_19_nodes():
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     init_py = os.path.join(repo_root, "__init__.py")
     pkg_name = "ComfyUI-YesAPI"
@@ -232,7 +265,7 @@ def test_comfyui_hyphenated_package_loader_registers_all_18_nodes():
 
     mappings = module.NODE_CLASS_MAPPINGS
     display = module.NODE_DISPLAY_NAME_MAPPINGS
-    assert len(mappings) == 18
+    assert len(mappings) == 19
     assert set(mappings.keys()) == set(display.keys())
 
     for key, cls in mappings.items():
