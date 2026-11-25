@@ -1,0 +1,112 @@
+{
+  "id": "11111111-2222-4333-8444-555555555502",
+  "revision": 0,
+  "last_node_id": 4,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "YesAPILLMWriter",
+      "pos": [60, 120],
+      "size": [420, 380],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "file_path", "type": "STRING", "links": [1]},
+        {"name": "prompts_preview", "type": "STRING", "links": null},
+        {"name": "status", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "YesAPILLMWriter"},
+      "widgets_values": [
+        "gemini-3.8-flash",
+        "auto",
+        "请为我生成 5 条关于“夏日海边咖啡馆”的高细节绘画提示词，仅输出 JSON 字符串数组。",
+        "你是一名专业的 AI 绘画提示词专家。请严格只输出一个 JSON 字符串数组，不要输出任何额外解释。",
+        "generated_prompts.csv",
+        "prompt",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 2,
+      "type": "YesAPIImageSaveWithPrompt",
+      "pos": [540, 100],
+      "size": [440, 480],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "file_path", "type": "STRING", "widget": {"name": "file_path"}, "link": 1}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": [2, 3]},
+        {"name": "status", "type": "STRING", "links": null},
+        {"name": "filenames", "type": "STRING", "links": [4]}
+      ],
+      "properties": {"Node name for S&R": "YesAPIImageSaveWithPrompt"},
+      "widgets_values": [
+        "",
+        "prompt",
+        "",
+        "YesAPI_Batch/Cafe",
+        "",
+        "",
+        "Nano-banana-Pro",
+        "1024x1024",
+        "auto",
+        3,
+        50,
+        "保存 (Saved)",
+        "",
+        "",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "PreviewImage",
+      "pos": [1040, 100],
+      "size": [300, 280],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 2}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "widgets_values": []
+    },
+    {
+      "id": 4,
+      "type": "YesAPISaveImageByFilename",
+      "pos": [1040, 420],
+      "size": [320, 200],
+      "flags": {},
+      "order": 3,
+      "mode": 4,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 3},
+        {"name": "filenames", "type": "STRING", "widget": {"name": "filenames"}, "link": 4}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "YesAPISaveImageByFilename"},
+      "widgets_values": ["", "upscaled", "_copy"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "STRING"],
+    [2, 2, 0, 3, 0, "IMAGE"],
+    [3, 2, 0, 4, 0, "IMAGE"],
+    [4, 2, 2, 4, 1, "STRING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}
