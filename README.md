@@ -8,7 +8,7 @@
 
 ## ✨ 核心特性
 
-- **统一生图与编辑引擎**：无需第三方图床中转，纯文生图自动走 `/v1/images/generations`，连接 1~14 张参考图或 `MASK` 遮罩时自动走 `/v1/images/edits`（`multipart/form-data`）。
+- **统一生图与编辑引擎**：无需第三方图床中转，纯文生图自动走 `/v1/images/generations`，连接 1~14 张参考图或 `MASK` 遮罩时自动走 `/v1/images/edits`（`multipart/form-data`）；**画幅比例（`aspect_ratio`：`auto` / `1:1` / `16:9` / `9:16` / `4:3` / `3:4` / `3:2` / `2:3` / `21:9`）与分辨率档位（`resolution`：`默认` / `512 (小)` / `1K` / `2K` / `4K`）完全独立分开选择**，底层自动映射为与官方工作台一致的精确像素分辨率，同时保留 `custom_size` 自定义像素覆盖。
 - **防截断自动压图**：自动检测参考图体积，超过 `19MB` 时自动高质量缩放/压缩，避免触发平台 `20MB` 截断导致识图失败。
 - **分组 API Key 隔离与防泄露**：针对 Yesapi「API Key 绑定模型分组」机制，支持在本地 `config.json`（已被 `.gitignore` 严格排除，绝不会误传 GitHub）中按 `image_api_key`、`llm_api_key`、`video_api_key` 独立配置，彻底告别 `分组不匹配` 报错。
 - **模型永不过时**：内置平台模型广场最新主力型号下拉框，同时所有节点均提供 `custom_model` 输入框（填写后优先覆盖下拉选项），并附带 `YesAPIModelList` 节点一键拉取当前 Key 可用模型列表。

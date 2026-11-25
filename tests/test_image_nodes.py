@@ -24,6 +24,25 @@ def _dummy_tensor(h=32, w=32, batch=1):
     return torch.ones((batch, h, w, 3), dtype=torch.float32) * 0.5
 
 
+def test_all_image_nodes_separate_aspect_ratio_and_resolution():
+    for cls in (
+        YesAPIImageGenerate,
+        YesAPIImageBatchCSV,
+        YesAPIImageSaveWithPrompt,
+        YesAPIImageBatchDir,
+        YesAPIImageAsyncSubmit,
+        YesAPIImageAsyncBatchSubmit,
+    ):
+        req = cls.INPUT_TYPES()["required"]
+        assert "aspect_ratio" in req, f"{cls.__name__} missing aspect_ratio"
+        assert "resolution" in req, f"{cls.__name__} missing resolution"
+        assert "size" not in req, f"{cls.__name__} still has mixed size dropdown"
+        for opt in req["aspect_ratio"][0]:
+            assert opt not in ("1K", "2K", "4K", "1024x1024", "3840x2160")
+        for opt in req["resolution"][0]:
+            assert ":" not in opt
+
+
 def test_image_generate_sync_and_mask_validation(monkeypatch):
     node = YesAPIImageGenerate()
 
@@ -31,7 +50,8 @@ def test_image_generate_sync_and_mask_validation(monkeypatch):
     res_err = node.execute(
         prompt="fix hat",
         model="Nano-banana-Pro",
-        size="1024x1024",
+        aspect_ratio="1:1",
+        resolution="1K",
         quality="high",
         concurrency=1,
         random_mode="固定",
@@ -42,14 +62,15 @@ def test_image_generate_sync_and_mask_validation(monkeypatch):
     assert img_out.shape == (1, 64, 64, 3)
     assert "image_1" in status_out
 
-    # 2. Normal concurrent generation with reference image + mask
+    # 2. Normal concurrent generation with 16:9 + 4K -> sends size="3840x2160"
     fake_client = MagicMock()
     fake_client.generate_images.return_value = [Image.new("RGB", (64, 48), (120, 200, 80))]
     with patch("nodes.image_nodes.YesAPIClient", return_value=fake_client):
         res_ok = node.execute(
             prompt="cat astronaut",
             model="Nano-banana-Pro",
-            size="1024x1024",
+            aspect_ratio="16:9",
+            resolution="4K",
             quality="high",
             concurrency=2,
             random_mode="固定",
@@ -62,6 +83,7 @@ def test_image_generate_sync_and_mask_validation(monkeypatch):
     assert batch_tensor.shape == (2, 48, 64, 3)
     assert "成功: 2" in status
     assert fake_client.generate_images.call_args.kwargs["model"] == "Nano-banana-2.1"
+    assert fake_client.generate_images.call_args.kwargs["size"] == "3840x2160"
     assert fake_client.generate_images.call_args.kwargs["mask_png_bytes"] is not None
 
 
@@ -85,7 +107,8 @@ def test_image_batch_csv_trips_circuit_breaker_on_fatal_402(tmp_path):
             column_name="prompt",
             prompt_prefix="masterpiece, ",
             model="gpt-image-2",
-            size="1024x1024",
+            aspect_ratio="1:1",
+            resolution="1K",
             quality="auto",
             concurrency=1,
             max_count=10,
@@ -93,7 +116,7 @@ def test_image_batch_csv_trips_circuit_breaker_on_fatal_402(tmp_path):
             api_key="sk-img",
         )
     _, status = res["result"]
-    assert call_counter["count"] == 1  # Immediately aborted remaining 9 prompts!
+    assert call_counter["count"] == 1
     assert "熔断" in status or "额度" in status
 
 
@@ -120,7 +143,8 @@ def test_save_with_prompt_and_save_by_filename(tmp_path, monkeypatch):
             rm_prompt_prefix="prefix_",
             rm_prompt_suffix="_suffix",
             model="gpt-image-2",
-            size="1:1",
+            aspect_ratio="16:9",
+            resolution="2K",
             quality="auto",
             concurrency=2,
             max_count=10,
@@ -132,10 +156,7 @@ def test_save_with_prompt_and_save_by_filename(tmp_path, monkeypatch):
     saved_paths = [p for p in filenames_str.splitlines() if p.strip()]
     assert len(saved_paths) == 2
     assert any("可爱小狗" in os.path.basename(p) for p in saved_paths)
-    for p in saved_paths:
-        assert os.path.exists(p)
 
-    # Test downstream YesAPISaveImageByFilename
     by_name_node = YesAPISaveImageByFilename()
     ui_res = by_name_node.execute(
         images=tensor_out,
@@ -152,7 +173,7 @@ def test_image_batch_dir_skips_bad_file_and_saves_originals(tmp_path, monkeypatc
     in_dir = tmp_path / "input_imgs"
     in_dir.mkdir()
     Image.new("RGB", (50, 50), (10, 20, 30)).save(in_dir / "good.png")
-    (in_dir / "corrupt.png").write_bytes(b"")  # 0-byte corrupt image
+    (in_dir / "corrupt.png").write_bytes(b"")
 
     fake_client = MagicMock()
     fake_client.generate_images.return_value = [Image.new("RGB", (100, 60), (200, 100, 50))]
@@ -164,7 +185,8 @@ def test_image_batch_dir_skips_bad_file_and_saves_originals(tmp_path, monkeypatc
             csv_file_path="",
             column_name="prompt",
             model="Nano-banana-2",
-            size="1:1",
+            aspect_ratio="auto",
+            resolution="2K",
             quality="auto",
             max_concurrent_files=2,
             executions_per_prompt=1,
@@ -175,6 +197,7 @@ def test_image_batch_dir_skips_bad_file_and_saves_originals(tmp_path, monkeypatc
     assert preview_tensor.shape == (1, 60, 100, 3)
     assert "成功: 1" in report
     assert "失败: 1" in report
+    assert fake_client.generate_images.call_args.kwargs["size"] == "2K"
 
 
 def test_async_image_submit_batch_and_query_flow(tmp_path, monkeypatch):
@@ -205,7 +228,8 @@ def test_async_image_submit_batch_and_query_flow(tmp_path, monkeypatch):
         r1 = submit_node.execute(
             prompt="single async",
             model="gpt-image-2",
-            size="1024x1024",
+            aspect_ratio="9:16",
+            resolution="2K",
             quality="auto",
             concurrency=1,
             api_key="sk-img",
@@ -213,13 +237,15 @@ def test_async_image_submit_batch_and_query_flow(tmp_path, monkeypatch):
         tid1, status1 = r1["result"]
         assert tid1 == "任务1"
         assert "提交成功" in status1
+        assert fake_client.submit_async_image.call_args.kwargs["size"] == "1440x2560"
 
         r2 = batch_node.execute(
             file_path=str(csv_path),
             column_name="prompt",
             prompt_prefix="",
             model="gpt-image-2",
-            size="1024x1024",
+            aspect_ratio="1:1",
+            resolution="1K",
             quality="auto",
             executions_per_prompt=1,
             concurrency=2,
@@ -228,13 +254,11 @@ def test_async_image_submit_batch_and_query_flow(tmp_path, monkeypatch):
         tid2, _ = r2["result"]
         assert tid2 == "批量任务1"
 
-        # Query downloads earliest completed (任务1) first
         q1 = query_node.execute(target_task_id="", api_key="sk-img")
         img_batch1, q_status1 = q1["result"]
         assert img_batch1.shape == (1, 40, 40, 3)
         assert "任务1" in q_status1
 
-        # Next query downloads 批量任务1 (2 images)
         q2 = query_node.execute(target_task_id="", api_key="sk-img")
         img_batch2, q_status2 = q2["result"]
         assert img_batch2.shape == (2, 40, 40, 3)

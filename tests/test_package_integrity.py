@@ -64,3 +64,20 @@ def test_readme_documents_all_18_nodes_and_workflows_are_valid():
                 referenced_yesapi_nodes.add(ntype)
 
     assert len(referenced_yesapi_nodes) >= 8
+
+
+def test_no_node_mixes_aspect_ratio_and_resolution_in_single_dropdown():
+    for node_key, cls in root_pkg.NODE_CLASS_MAPPINGS.items():
+        it = cls.INPUT_TYPES()
+        for sec in ("required", "optional"):
+            for param_name, spec in it.get(sec, {}).items():
+                opts = spec[0]
+                if isinstance(opts, list):
+                    has_ratio = any(isinstance(x, str) and ":" in x for x in opts)
+                    has_res_or_px = any(
+                        isinstance(x, str) and (x.upper().endswith(("K", "P")) or "x" in x.lower())
+                        for x in opts
+                    )
+                    assert not (has_ratio and has_res_or_px), (
+                        f"{node_key}.{param_name} mixes aspect ratios and resolutions: {opts}"
+                    )

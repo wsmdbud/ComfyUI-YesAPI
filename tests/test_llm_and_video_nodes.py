@@ -159,11 +159,16 @@ def test_video_sync_and_async_queue_nodes(tmp_path, monkeypatch):
         patch("nodes.video_nodes.time.sleep", return_value=None),
         patch("nodes.video_nodes._get_video_task_store", side_effect=lambda: __import__("core.task_store", fromlist=["JsonTaskStore"]).JsonTaskStore(vid_store_path)),
     ):
-        # 1. Sync video generate
+        # 1. Sync video generate (verify separate aspect_ratio and resolution)
+        for vcls in (YesAPIVideoGenerate, YesAPIVideoAsyncSubmit, YesAPIVideoAsyncBatchSubmit):
+            vreq = vcls.INPUT_TYPES()["required"]
+            assert "aspect_ratio" in vreq and "resolution" in vreq
+
         s_res = sync_node.execute(
             prompt="drone shot",
             model="Veo-3.1-fast-1080P",
             aspect_ratio="16:9",
+            resolution="默认",
             duration=5,
             poll_timeout_sec=60,
             first_frame=_dummy_img(),
@@ -179,6 +184,7 @@ def test_video_sync_and_async_queue_nodes(tmp_path, monkeypatch):
             prompt="cat jump",
             model="Veo-3.1-fast-1080P",
             aspect_ratio="16:9",
+            resolution="1080P",
             duration=5,
             api_key="sk-vid",
         )
@@ -190,6 +196,7 @@ def test_video_sync_and_async_queue_nodes(tmp_path, monkeypatch):
             prompt_prefix="",
             model="Veo-3.1-fast-1080P",
             aspect_ratio="16:9",
+            resolution="默认",
             duration=5,
             concurrency=2,
             max_count=10,

@@ -6,8 +6,11 @@ import pytest
 
 from core.compat import get_output_directory, get_temp_directory, ProgressBar, VIDEO_TYPE
 from core.config import (
+    IMAGE_ASPECT_RATIOS,
+    IMAGE_RESOLUTIONS,
     resolve_api_key,
     resolve_base_url,
+    resolve_image_size,
     resolve_model,
     clean_user_path,
     format_yesapi_error,
@@ -57,6 +60,26 @@ def test_resolve_model_and_clean_user_path():
     assert resolve_model("Nano-banana-Pro", "  gpt-image-3-preview  ") == "gpt-image-3-preview"
     assert clean_user_path('  "E:\\Desktop\\prompts.csv"  ') == r"E:\Desktop\prompts.csv"
     assert clean_user_path("  'D:/imgs/a.png' ") == "D:/imgs/a.png"
+
+
+def test_aspect_ratio_and_resolution_are_strictly_separated():
+    # Aspect ratios must NEVER contain resolution tiers or WxH pixels
+    for ar in IMAGE_ASPECT_RATIOS:
+        assert ar in {"auto", "1:1", "16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "21:9"}
+    # Resolutions must NEVER contain aspect ratios
+    for res in IMAGE_RESOLUTIONS:
+        assert ":" not in res
+
+    assert resolve_image_size("1:1", "1K") == "1024x1024"
+    assert resolve_image_size("16:9", "1K") == "1920x1080"
+    assert resolve_image_size("16:9", "4K") == "3840x2160"
+    assert resolve_image_size("9:16", "2K") == "1440x2560"
+    assert resolve_image_size("1:1", "512 (小)") == "512x512"
+    assert resolve_image_size("auto", "默认") is None
+    assert resolve_image_size("auto", "1K") is None
+    assert resolve_image_size("auto", "2K") == "2K"
+    assert resolve_image_size("auto", "4K") == "4K"
+    assert resolve_image_size("16:9", "2K", "1792×1024") == "1792x1024"
 
 
 def test_format_yesapi_error_classifies_fatal_and_adds_hints():

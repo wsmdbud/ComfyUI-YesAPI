@@ -14,11 +14,13 @@ try:
     from ..core.client import YesAPIClient, YesAPIError
     from ..core.compat import get_temp_directory
     from ..core.config import (
+        IMAGE_ASPECT_RATIOS,
         IMAGE_MODELS,
         IMAGE_QUALITIES,
-        IMAGE_SIZES,
+        IMAGE_RESOLUTIONS,
         resolve_api_key,
         resolve_base_url,
+        resolve_image_size,
         resolve_model,
         resolve_timeout,
     )
@@ -34,11 +36,13 @@ except ImportError:
     from core.client import YesAPIClient, YesAPIError
     from core.compat import get_temp_directory
     from core.config import (
+        IMAGE_ASPECT_RATIOS,
         IMAGE_MODELS,
         IMAGE_QUALITIES,
-        IMAGE_SIZES,
+        IMAGE_RESOLUTIONS,
         resolve_api_key,
         resolve_base_url,
+        resolve_image_size,
         resolve_model,
         resolve_timeout,
     )
@@ -81,7 +85,7 @@ class YesAPIImageAsyncSubmit:
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         optional: Dict[str, Any] = {
             "custom_model": ("STRING", {"default": "", "multiline": False}),
-            "custom_size": ("STRING", {"default": "", "multiline": False}),
+            "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
             "mask": ("MASK",),
         }
         for i in range(1, 15):
@@ -93,7 +97,8 @@ class YesAPIImageAsyncSubmit:
             "required": {
                 "prompt": ("STRING", {"multiline": True, "default": "A cute cat wearing a tiny astronaut helmet"}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "concurrency": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
             },
@@ -108,7 +113,8 @@ class YesAPIImageAsyncSubmit:
         self,
         prompt: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         concurrency: int,
         custom_model: str = "",
@@ -135,7 +141,7 @@ class YesAPIImageAsyncSubmit:
 
         mask_bytes = mask_to_png_bytes(mask, target_size=refs[0].size) if mask is not None and refs else None
         final_model = resolve_model(model, custom_model)
-        final_size = custom_size.strip() if custom_size and custom_size.strip() else size
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
 
         try:
             client = YesAPIClient(
@@ -171,14 +177,16 @@ class YesAPIImageAsyncSubmit:
                     "type": "normal",
                     "prompt": clean_prompt,
                     "model": final_model,
-                    "size": final_size,
+                    "aspect_ratio": aspect_ratio,
+                    "resolution": resolution,
+                    "size": final_size or "auto",
                     "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "status": "pending",
                     "concurrency": len(subtasks),
                     "subtasks": subtasks,
                 },
             )
-            status = f"任务提交成功 | {task_id} | 模型: {final_model} | 子任务数: {len(subtasks)}（请在 2 小时内使用异步查询下载节点提取结果）"
+            status = f"任务提交成功 | {task_id} | 尺寸: {final_size or 'auto'} | 模型: {final_model} | 子任务数: {len(subtasks)}（请在 2 小时内使用异步查询下载节点提取结果）"
             return {"ui": {"string": [status]}, "result": (task_id, status)}
         except Exception as e:
             msg = f"提交失败: {e}"
@@ -204,14 +212,15 @@ class YesAPIImageAsyncBatchSubmit:
                 "column_name": ("STRING", {"default": "prompt"}),
                 "prompt_prefix": ("STRING", {"multiline": True, "default": ""}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "executions_per_prompt": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
                 "concurrency": ("INT", {"default": 3, "min": 1, "max": 15, "step": 1}),
             },
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
-                "custom_size": ("STRING", {"default": "", "multiline": False}),
+                "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
                 "image_1": ("IMAGE",),
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
@@ -231,7 +240,8 @@ class YesAPIImageAsyncBatchSubmit:
         column_name: str,
         prompt_prefix: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         executions_per_prompt: int,
         concurrency: int = 3,
@@ -265,7 +275,7 @@ class YesAPIImageAsyncBatchSubmit:
         prompts = [p for p in base_prompts for _ in range(max(1, int(executions_per_prompt)))]
         refs = _collect_refs(kwargs, max_slots=4)
         final_model = resolve_model(model, custom_model)
-        final_size = custom_size.strip() if custom_size and custom_size.strip() else size
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
 
         try:
             client = YesAPIClient(
@@ -327,14 +337,16 @@ class YesAPIImageAsyncBatchSubmit:
                 "type": "batch",
                 "prompt": f"批量文件: {os.path.basename(file_path)}",
                 "model": final_model,
-                "size": final_size,
+                "aspect_ratio": aspect_ratio,
+                "resolution": resolution,
+                "size": final_size or "auto",
                 "submitted_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "status": "pending",
                 "concurrency": len(subtasks),
                 "subtasks": subtasks,
             },
         )
-        status = f"批量提交成功 | {batch_id} | 成功提交: {len(subtasks)}/{len(prompts)} | 模型: {final_model}"
+        status = f"批量提交成功 | {batch_id} | 成功提交: {len(subtasks)}/{len(prompts)} | 尺寸: {final_size or 'auto'} | 模型: {final_model}"
         if errors:
             status += f" | 提交失败: {len(errors)}"
         return {"ui": {"string": [status]}, "result": (batch_id, status)}
@@ -422,7 +434,6 @@ class YesAPIImageAsyncQuery:
             msg = f"查询失败: {e}"
             return {"ui": {"string": [msg]}, "result": (make_error_image_tensor(), msg)}
 
-        # Step 1: Refresh all pending tasks
         updated_tasks: Dict[str, Dict[str, Any]] = {}
         for tid, info in tasks.items():
             if info.get("status") in ("completed", "failed", "downloaded"):
@@ -469,7 +480,6 @@ class YesAPIImageAsyncQuery:
             store.mutate(_apply_updates)
             tasks = store.get_tasks()
 
-        # Step 2: Select target completed task to download
         clean_target = (target_task_id or "").strip()
         chosen: Optional[Tuple[str, Dict[str, Any]]] = None
         if clean_target:

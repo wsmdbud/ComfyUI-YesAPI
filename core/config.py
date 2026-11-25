@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Dict, Optional, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,10 +23,8 @@ IMAGE_MODELS = [
     "gpt-image-2",
 ]
 
-IMAGE_SIZES = [
-    "1024x1024",
-    "1536x1024",
-    "1024x1536",
+IMAGE_ASPECT_RATIOS = [
+    "auto",
     "1:1",
     "16:9",
     "9:16",
@@ -33,10 +32,76 @@ IMAGE_SIZES = [
     "3:4",
     "3:2",
     "2:3",
+    "21:9",
+]
+
+IMAGE_RESOLUTIONS = [
+    "默认",
+    "512 (小)",
+    "1K",
     "2K",
     "4K",
-    "3840x2160",
 ]
+
+# Pixel lookup table aligned with Yesapi ImageStudioView (ye) + standard extended ratios
+ASPECT_RESOLUTION_MAP: Dict[str, Dict[str, str]] = {
+    "1:1": {
+        "512 (小)": "512x512",
+        "默认": "1024x1024",
+        "1K": "1024x1024",
+        "2K": "2048x2048",
+        "4K": "4096x4096",
+    },
+    "16:9": {
+        "512 (小)": "1280x720",
+        "默认": "1920x1080",
+        "1K": "1920x1080",
+        "2K": "2560x1440",
+        "4K": "3840x2160",
+    },
+    "9:16": {
+        "512 (小)": "720x1280",
+        "默认": "1080x1920",
+        "1K": "1080x1920",
+        "2K": "1440x2560",
+        "4K": "2160x3840",
+    },
+    "4:3": {
+        "512 (小)": "1024x768",
+        "默认": "1600x1200",
+        "1K": "1600x1200",
+        "2K": "2048x1536",
+        "4K": "3840x2880",
+    },
+    "3:4": {
+        "512 (小)": "768x1024",
+        "默认": "1200x1600",
+        "1K": "1200x1600",
+        "2K": "1536x2048",
+        "4K": "2880x3840",
+    },
+    "3:2": {
+        "512 (小)": "1080x720",
+        "默认": "1536x1024",
+        "1K": "1536x1024",
+        "2K": "2304x1536",
+        "4K": "3840x2560",
+    },
+    "2:3": {
+        "512 (小)": "720x1080",
+        "默认": "1024x1536",
+        "1K": "1024x1536",
+        "2K": "1536x2304",
+        "4K": "2560x3840",
+    },
+    "21:9": {
+        "512 (小)": "1280x548",
+        "默认": "2560x1080",
+        "1K": "2560x1080",
+        "2K": "2560x1080",
+        "4K": "3840x1646",
+    },
+}
 
 IMAGE_QUALITIES = ["auto", "high", "medium", "low"]
 
@@ -73,6 +138,36 @@ VIDEO_MODELS = [
 ]
 
 VIDEO_ASPECT_RATIOS = ["16:9", "9:16", "1:1"]
+VIDEO_RESOLUTIONS = ["默认", "480P", "720P", "1080P"]
+
+
+def resolve_image_size(
+    aspect_ratio: str = "1:1",
+    resolution: str = "1K",
+    custom_size: str = "",
+) -> Optional[str]:
+    """
+    Combine separated aspect_ratio and resolution into Yesapi's OpenAI Images 'size' parameter.
+    - custom_size non-empty: normalize '1792×1024' -> '1792x1024' and return directly.
+    - aspect_ratio == 'auto': return '2K' / '4K' when explicitly requested, else None (omit size so model decides).
+    - concrete ratio: map (aspect_ratio, resolution) -> exact 'WxH' pixel string.
+    """
+    if custom_size and custom_size.strip():
+        cleaned = re.sub(r"(\d+)\s*[×xX]\s*(\d+)", r"\1x\2", custom_size.strip())
+        return cleaned
+
+    ar = (aspect_ratio or "auto").strip()
+    res = (resolution or "默认").strip()
+
+    if ar == "auto":
+        if res in ("2K", "4K"):
+            return res
+        return None
+
+    ratio_table = ASPECT_RESOLUTION_MAP.get(ar)
+    if ratio_table:
+        return ratio_table.get(res, ratio_table["1K"])
+    return "1024x1024"
 
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
@@ -215,7 +310,6 @@ def format_yesapi_error(
             if category == "video"
             else "（可使用『🔍 YesAPI 可用模型查询』节点核对当前 Key 可用的完整模型名）"
         )
-        # Model unsupported is fatal for a batch using that exact model
         return (f"模型不受支持: {text} {extra}", True)
 
     if "payload is too large" in lower or status_code == 413:

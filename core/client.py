@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from io import BytesIO
 import os
+import re
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from PIL import Image
@@ -13,6 +14,12 @@ from .config import DEFAULT_BASE_URL, DEFAULT_TIMEOUT_SECONDS, format_yesapi_err
 from .media import encode_image_under_limit, pil_to_base64_jpeg, pil_to_data_uri
 
 MultipartSpec = Tuple[str, Tuple[str, bytes, str]]
+_NANO_OR_GEMINI_IMAGE_RE = re.compile(r"nano-?banana|gemini|imagen", re.IGNORECASE)
+
+
+def _supports_quality_param(model: str) -> bool:
+    """Matches Yesapi ImageStudioView: Nano-banana/Gemini/Imagen models omit 'quality'."""
+    return not bool(_NANO_OR_GEMINI_IMAGE_RE.search(model or ""))
 
 
 class YesAPIError(Exception):
@@ -97,6 +104,7 @@ class YesAPIClient:
         primary_path: str,
         alt_path: Optional[str] = None,
         *,
+        extra_alt_paths: Optional[Sequence[str]] = None,
         headers: Optional[Dict[str, str]] = None,
         json_body: Optional[Dict[str, Any]] = None,
         form_data: Optional[Dict[str, Any]] = None,
@@ -105,8 +113,11 @@ class YesAPIClient:
         timeout: Optional[int] = None,
     ) -> requests.Response:
         paths = [primary_path]
-        if alt_path and alt_path != primary_path:
+        if alt_path and alt_path not in paths:
             paths.append(alt_path)
+        for p in extra_alt_paths or ():
+            if p and p not in paths:
+                paths.append(p)
 
         req_timeout = timeout or self.timeout
         last_resp: Optional[requests.Response] = None
@@ -162,6 +173,8 @@ class YesAPIClient:
         items: List[Dict[str, Any]] = []
         if isinstance(payload.get("data"), list):
             items = [x for x in payload["data"] if isinstance(x, dict)]
+        elif isinstance(payload.get("result"), dict) and isinstance(payload["result"].get("data"), list):
+            items = [x for x in payload["result"]["data"] if isinstance(x, dict)]
         elif isinstance(payload.get("results"), list):
             items = [x for x in payload["results"] if isinstance(x, dict)]
         elif "b64_json" in payload or "url" in payload:
@@ -181,13 +194,28 @@ class YesAPIClient:
             raise YesAPIError(f"接口响应中未找到有效图像数据: {str(payload)[:240]}", is_fatal=False)
         return images
 
+    @staticmethod
+    def _build_edit_files_spec(
+        refs: Sequence[Image.Image],
+        mask_png_bytes: Optional[bytes] = None,
+    ) -> List[MultipartSpec]:
+        # Matches Yesapi ImageStudioView: singular 'image' when 1 ref, repeated 'image[]' when >1 refs
+        field_name = "image" if len(refs) == 1 else "image[]"
+        files_spec: List[MultipartSpec] = []
+        for idx, pil_img in enumerate(refs):
+            img_bytes, fname, mime = encode_image_under_limit(pil_img, index=idx)
+            files_spec.append((field_name, (fname, img_bytes, mime)))
+        if mask_png_bytes is not None:
+            files_spec.append(("mask", ("mask.png", mask_png_bytes, "image/png")))
+        return files_spec
+
     # ==================== 1. Image Generation & Editing ====================
 
     def generate_images(
         self,
         prompt: str,
         model: str,
-        size: str = "1024x1024",
+        size: Optional[str] = "1024x1024",
         quality: str = "auto",
         n: int = 1,
         ref_images: Optional[Sequence[Image.Image]] = None,
@@ -200,14 +228,17 @@ class YesAPIClient:
                 is_fatal=True,
             )
 
+        allow_quality = quality and quality != "auto" and _supports_quality_param(model)
+
         if not refs and mask_png_bytes is None:
             payload: Dict[str, Any] = {
                 "model": model,
                 "prompt": prompt,
-                "size": size,
                 "response_format": "b64_json",
             }
-            if quality and quality != "auto":
+            if size and size.strip():
+                payload["size"] = size.strip()
+            if allow_quality:
                 payload["quality"] = quality
             if n > 1:
                 payload["n"] = int(n)
@@ -221,21 +252,15 @@ class YesAPIClient:
             )
             return self._extract_images_from_payload(resp.json())
 
-        # Multipart /images/edits
-        files_spec: List[MultipartSpec] = []
-        for idx, pil_img in enumerate(refs):
-            img_bytes, fname, mime = encode_image_under_limit(pil_img, index=idx)
-            files_spec.append(("image[]", (fname, img_bytes, mime)))
-        if mask_png_bytes is not None:
-            files_spec.append(("mask", ("mask.png", mask_png_bytes, "image/png")))
-
+        files_spec = self._build_edit_files_spec(refs, mask_png_bytes)
         form_data: Dict[str, Any] = {
             "model": model,
             "prompt": prompt,
-            "size": size,
             "response_format": "b64_json",
         }
-        if quality and quality != "auto":
+        if size and size.strip():
+            form_data["size"] = size.strip()
+        if allow_quality:
             form_data["quality"] = quality
         if n > 1:
             form_data["n"] = str(int(n))
@@ -254,7 +279,7 @@ class YesAPIClient:
         self,
         prompt: str,
         model: str,
-        size: str = "1024x1024",
+        size: Optional[str] = "1024x1024",
         quality: str = "auto",
         ref_images: Optional[Sequence[Image.Image]] = None,
         mask_png_bytes: Optional[bytes] = None,
@@ -266,53 +291,59 @@ class YesAPIClient:
                 is_fatal=True,
             )
 
+        allow_quality = quality and quality != "auto" and _supports_quality_param(model)
+
         if not refs and mask_png_bytes is None:
             payload: Dict[str, Any] = {
                 "model": model,
                 "prompt": prompt,
-                "size": size,
                 "response_format": "url",
                 "n": 1,
                 "async": True,
             }
-            if quality and quality != "auto":
+            if size and size.strip():
+                payload["size"] = size.strip()
+            if allow_quality:
                 payload["quality"] = quality
             resp = self._request(
                 "POST",
                 "/v1/images/generations",
                 "/images/generations",
+                extra_alt_paths=("/v1/images/generations/async",),
                 headers=self._bearer_headers(json_content=True),
                 json_body=payload,
             )
         else:
-            files_spec: List[MultipartSpec] = []
-            for idx, pil_img in enumerate(refs):
-                img_bytes, fname, mime = encode_image_under_limit(pil_img, index=idx)
-                files_spec.append(("image[]", (fname, img_bytes, mime)))
-            if mask_png_bytes is not None:
-                files_spec.append(("mask", ("mask.png", mask_png_bytes, "image/png")))
-
+            files_spec = self._build_edit_files_spec(refs, mask_png_bytes)
             form_data: Dict[str, Any] = {
                 "model": model,
                 "prompt": prompt,
-                "size": size,
                 "response_format": "url",
                 "n": "1",
                 "async": "true",
             }
-            if quality and quality != "auto":
+            if size and size.strip():
+                form_data["size"] = size.strip()
+            if allow_quality:
                 form_data["quality"] = quality
             resp = self._request(
                 "POST",
                 "/v1/images/edits",
                 "/images/edits",
+                extra_alt_paths=("/v1/images/edits/async",),
                 headers=self._bearer_headers(json_content=False),
                 form_data=form_data,
                 files_spec=files_spec,
             )
 
         data = resp.json()
-        img_id = str(data.get("id") or (data.get("data") or {}).get("id") or "").strip()
+        img_id = str(
+            data.get("id")
+            or data.get("task_id")
+            or (data.get("data") or {}).get("id")
+            or (data.get("data") or {}).get("task_id")
+            or ""
+        ).strip()
         if not img_id:
             raise YesAPIError(f"异步图像提交未返回有效任务 ID: {data}", is_fatal=False)
         return img_id
@@ -322,6 +353,7 @@ class YesAPIClient:
             "GET",
             f"/v1/images/{image_id}",
             f"/images/{image_id}",
+            extra_alt_paths=(f"/v1/images/tasks/{image_id}",),
             headers=self._bearer_headers(json_content=False),
             timeout=30,
         )
@@ -341,10 +373,16 @@ class YesAPIClient:
         else:
             err_str = str(err_val) if err_val else ""
 
+        direct_url = None
+        if isinstance(payload.get("result"), dict) and isinstance(payload["result"].get("data"), list):
+            first_item = payload["result"]["data"][0] if payload["result"]["data"] else {}
+            if isinstance(first_item, dict) and first_item.get("url"):
+                direct_url = str(first_item["url"])
+
         return {
-            "id": str(payload.get("id") or image_id),
+            "id": str(payload.get("id") or payload.get("task_id") or image_id),
             "status": norm_status,
-            "content_url": payload.get("content_url") or f"/v1/images/{image_id}/content",
+            "content_url": direct_url or payload.get("content_url") or f"/v1/images/{image_id}/content",
             "error": err_str,
             "raw": raw,
         }
@@ -356,7 +394,7 @@ class YesAPIClient:
             "GET",
             primary,
             alt if not primary.startswith(("http://", "https://")) else None,
-            headers=self._bearer_headers(json_content=False),
+            headers=self._bearer_headers(json_content=False) if not primary.startswith(("http://", "https://")) else None,
             timeout=120,
         )
         ctype = str(resp.headers.get("Content-Type", "")).lower()
@@ -426,7 +464,6 @@ class YesAPIClient:
                 return "".join(texts).strip()
             raise YesAPIError(f"Anthropic 响应格式异常: {str(data)[:240]}", is_fatal=False)
 
-        # OpenAI Chat Completions protocol
         messages: List[Dict[str, Any]] = []
         if system_prompt and system_prompt.strip():
             messages.append({"role": "system", "content": system_prompt.strip()})
@@ -500,6 +537,7 @@ class YesAPIClient:
         prompt: str,
         duration: int = 5,
         aspect_ratio: str = "16:9",
+        resolution: str = "默认",
         first_frame: Optional[Image.Image] = None,
         last_frame: Optional[Image.Image] = None,
         audio_url: str = "",
@@ -514,6 +552,8 @@ class YesAPIClient:
             "duration": int(duration),
             "aspect_ratio": aspect_ratio,
         }
+        if resolution and resolution.strip() and resolution.strip() != "默认":
+            payload["resolution"] = resolution.strip().lower()
         if audio_url and audio_url.strip():
             payload["audio_url"] = audio_url.strip()
         if first_frame is not None:

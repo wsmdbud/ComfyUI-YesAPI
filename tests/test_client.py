@@ -56,7 +56,7 @@ def test_image_edits_multipart_and_mask_without_image_validation():
     assert "image_1" in str(exc_info.value)
     assert session.request.call_count == 0
 
-    # Valid edit with 2 reference images + mask
+    # Valid edit with 2 reference images + mask -> uses image[]
     png_b64 = base64.b64encode(_make_png_bytes((255, 128, 0))).decode("utf-8")
     session.request.return_value = _mock_response(200, json_data={"data": [{"b64_json": png_b64}]})
     ref1 = Image.new("RGB", (64, 64), (10, 20, 30))
@@ -64,6 +64,8 @@ def test_image_edits_multipart_and_mask_without_image_validation():
     imgs = client.generate_images(
         prompt="combine",
         model="Nano-banana-2.1",
+        size=None,
+        quality="high",
         ref_images=[ref1, ref2],
         mask_png_bytes=_make_png_bytes(),
     )
@@ -73,6 +75,23 @@ def test_image_edits_multipart_and_mask_without_image_validation():
     field_names = [f[0] for f in files_sent]
     assert field_names.count("image[]") == 2
     assert "mask" in field_names
+    # Nano-banana models must strip unsupported 'quality' and omit empty 'size'
+    assert "quality" not in call_kwargs["data"]
+    assert "size" not in call_kwargs["data"]
+
+    # Valid edit with 1 reference image -> uses singular 'image' per ImageStudioView
+    client.generate_images(
+        prompt="single edit",
+        model="gpt-image-2",
+        size="1024x1024",
+        quality="high",
+        ref_images=[ref1],
+    )
+    single_kwargs = session.request.call_args.kwargs
+    single_fields = [f[0] for f in single_kwargs["files"]]
+    assert single_fields == ["image"]
+    assert single_kwargs["data"]["quality"] == "high"
+    assert single_kwargs["data"]["size"] == "1024x1024"
 
 
 def test_async_image_submit_poll_and_binary_content_download():

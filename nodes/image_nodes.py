@@ -16,12 +16,14 @@ try:
     from ..core.client import YesAPIClient, YesAPIError
     from ..core.compat import get_output_directory, get_temp_directory
     from ..core.config import (
+        IMAGE_ASPECT_RATIOS,
         IMAGE_MODELS,
         IMAGE_QUALITIES,
-        IMAGE_SIZES,
+        IMAGE_RESOLUTIONS,
         clean_user_path,
         resolve_api_key,
         resolve_base_url,
+        resolve_image_size,
         resolve_model,
         resolve_timeout,
     )
@@ -39,12 +41,14 @@ except ImportError:
     from core.client import YesAPIClient, YesAPIError
     from core.compat import get_output_directory, get_temp_directory
     from core.config import (
+        IMAGE_ASPECT_RATIOS,
         IMAGE_MODELS,
         IMAGE_QUALITIES,
-        IMAGE_SIZES,
+        IMAGE_RESOLUTIONS,
         clean_user_path,
         resolve_api_key,
         resolve_base_url,
+        resolve_image_size,
         resolve_model,
         resolve_timeout,
     )
@@ -69,12 +73,6 @@ def _collect_ref_pils(kwargs: Dict[str, Any], max_slots: int) -> List[Image.Imag
             if pils:
                 refs.extend(pils)
     return refs
-
-
-def _resolve_size(selected_size: str, custom_size: str = "") -> str:
-    if custom_size and custom_size.strip():
-        return custom_size.strip()
-    return (selected_size or "1024x1024").strip()
 
 
 class _YesAPIImageNodeBase:
@@ -102,7 +100,7 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         optional: Dict[str, Any] = {
             "custom_model": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：填写平台新模型名覆盖上方下拉框"}),
-            "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义尺寸如 1792x1024"}),
+            "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
             "mask": ("MASK",),
         }
         for i in range(1, 15):
@@ -114,7 +112,8 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
             "required": {
                 "prompt": ("STRING", {"multiline": True, "default": "A cute cat wearing a tiny astronaut helmet"}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "concurrency": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
                 "random_mode": (["固定", "随机"], {"default": "随机"}),
@@ -135,7 +134,8 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
         self,
         prompt: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         concurrency: int,
         random_mode: str = "随机",
@@ -155,7 +155,7 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
             return self._error_2tuple("API Key 不能为空。请在节点填入 api_key 或在 config.json 中配置 image_api_key。")
 
         final_model = resolve_model(model, custom_model)
-        final_size = _resolve_size(size, custom_size)
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
         refs = _collect_ref_pils(kwargs, max_slots=14)
 
         if mask is not None and not refs:
@@ -207,7 +207,8 @@ class YesAPIImageGenerate(_YesAPIImageNodeBase):
             return self._error_2tuple("; ".join(all_errors) if all_errors else "未生成任何图像")
 
         mode_label = "图生图/遮罩编辑" if (refs or mask_bytes) else "文生图"
-        status = f"成功: {len(all_images)} 张 | 失败: {len(all_errors)} | 模式: {mode_label} | 模型: {final_model}"
+        size_label = final_size or "auto"
+        status = f"成功: {len(all_images)} 张 | 失败: {len(all_errors)} | 模式: {mode_label} | 尺寸: {size_label} | 模型: {final_model}"
         if all_errors:
             status += f" | 首条错误: {all_errors[0]}"
         return {"ui": {"string": [status]}, "result": (safe_pil_batch_to_tensor(all_images), status)}
@@ -227,7 +228,8 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
                 "column_name": ("STRING", {"default": "prompt"}),
                 "prompt_prefix": ("STRING", {"multiline": True, "default": ""}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "concurrency": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
                 "max_count": ("INT", {"default": 50, "min": 1, "max": 500, "step": 1}),
@@ -235,7 +237,7 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
             },
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
-                "custom_size": ("STRING", {"default": "", "multiline": False}),
+                "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
                 "image_1": ("IMAGE",),
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
@@ -258,7 +260,8 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
         column_name: str,
         prompt_prefix: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         concurrency: int,
         max_count: int,
@@ -290,7 +293,7 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
         prompts = [p for p in base_prompts for _ in range(max(1, int(executions_per_prompt)))]
 
         final_model = resolve_model(model, custom_model)
-        final_size = _resolve_size(size, custom_size)
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
         refs = _collect_ref_pils(kwargs, max_slots=4)
 
         try:
@@ -362,7 +365,7 @@ class YesAPIImageBatchCSV(_YesAPIImageNodeBase):
             msg = abort_reason or ("; ".join(errors[:3]) if errors else "全部任务失败")
             return self._error_2tuple(msg)
 
-        status = f"批量完成 | 总任务: {len(prompts)} | 成功图像: {len(all_images)} | 失败: {len(errors)} | 模型: {final_model}"
+        status = f"批量完成 | 总任务: {len(prompts)} | 成功图像: {len(all_images)} | 失败: {len(errors)} | 尺寸: {final_size or 'auto'} | 模型: {final_model}"
         if abort_reason:
             status += f" | ⚠️ {abort_reason}"
         return {"ui": {"string": [status]}, "result": (safe_pil_batch_to_tensor(all_images), status)}
@@ -385,7 +388,8 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
                 "rm_prompt_prefix": ("STRING", {"multiline": False, "default": ""}),
                 "rm_prompt_suffix": ("STRING", {"multiline": False, "default": ""}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "1:1"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "concurrency": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
                 "max_count": ("INT", {"default": 50, "min": 1, "max": 500, "step": 1}),
@@ -393,7 +397,7 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
             },
             "optional": {
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
-                "custom_size": ("STRING", {"default": "", "multiline": False}),
+                "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
                 "image_1": ("IMAGE",),
                 "image_2": ("IMAGE",),
                 "image_3": ("IMAGE",),
@@ -419,7 +423,8 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
         rm_prompt_prefix: str,
         rm_prompt_suffix: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         concurrency: int,
         max_count: int,
@@ -448,7 +453,7 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
             return self._error_3tuple(f"列 '{col}' 中没有找到有效提示词。")
 
         final_model = resolve_model(model, custom_model)
-        final_size = _resolve_size(size, custom_size)
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
         refs = _collect_ref_pils(kwargs, max_slots=4)
 
         try:
@@ -555,7 +560,7 @@ class YesAPIImageSaveWithPrompt(_YesAPIImageNodeBase):
             return self._error_3tuple(abort_reason or ("; ".join(errors[:3]) if errors else "全部图像生成失败"))
 
         mode_summary = f"成功保存: {saved_count}" if ui_display_mode == "保存 (Saved)" else f"成功预览: {len(all_pil_images)}"
-        status = f"批量完成 | 总Prompt: {len(prompts)} | {mode_summary} | 失败: {len(errors)} | 模型: {final_model}"
+        status = f"批量完成 | 总Prompt: {len(prompts)} | {mode_summary} | 失败: {len(errors)} | 尺寸: {final_size or 'auto'} | 模型: {final_model}"
         if abort_reason:
             status += f" | ⚠️ {abort_reason}"
 
@@ -579,7 +584,8 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
                 "csv_file_path": ("STRING", {"default": "", "placeholder": "可选：CSV/Excel 提示词文件路径"}),
                 "column_name": ("STRING", {"default": "prompt"}),
                 "model": (IMAGE_MODELS, {"default": "Nano-banana-Pro"}),
-                "size": (IMAGE_SIZES, {"default": "1024x1024"}),
+                "aspect_ratio": (IMAGE_ASPECT_RATIOS, {"default": "auto"}),
+                "resolution": (IMAGE_RESOLUTIONS, {"default": "1K"}),
                 "quality": (IMAGE_QUALITIES, {"default": "auto"}),
                 "max_concurrent_files": ("INT", {"default": 3, "min": 1, "max": 20, "step": 1}),
                 "executions_per_prompt": ("INT", {"default": 1, "min": 1, "max": 10, "step": 1}),
@@ -587,7 +593,7 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
             "optional": {
                 "fixed_prompt": ("STRING", {"multiline": True, "default": "", "placeholder": "不用 CSV 时在此填固定提示词"}),
                 "custom_model": ("STRING", {"default": "", "multiline": False}),
-                "custom_size": ("STRING", {"default": "", "multiline": False}),
+                "custom_size": ("STRING", {"default": "", "multiline": False, "placeholder": "可选：自定义像素尺寸如 1792x1024"}),
                 "api_key": ("STRING", {"default": "", "multiline": False, "placeholder": "留空则读取 config.json 的 image_api_key"}),
                 "base_url": ("STRING", {"default": "", "multiline": False}),
             },
@@ -606,7 +612,8 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
         csv_file_path: str,
         column_name: str,
         model: str,
-        size: str,
+        aspect_ratio: str,
+        resolution: str,
         quality: str,
         max_concurrent_files: int,
         executions_per_prompt: int,
@@ -654,7 +661,7 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
 
         final_prompts = [p for p in base_prompts for _ in range(max(1, int(executions_per_prompt)))]
         final_model = resolve_model(model, custom_model)
-        final_size = _resolve_size(size, custom_size)
+        final_size = resolve_image_size(aspect_ratio, resolution, custom_size)
 
         try:
             client = YesAPIClient(
@@ -748,7 +755,7 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
         preview_images: List[Image.Image] = []
         logs: List[str] = [
             f"=== YesAPI Folder Batch Log ({timestamp}) ===",
-            f"Source: {source_mode}, Model: {final_model}, Prompts: {len(base_prompts)}, Images: {len(image_files)}",
+            f"Source: {source_mode}, Model: {final_model}, Size: {final_size or 'auto'}, Prompts: {len(base_prompts)}, Images: {len(image_files)}",
         ]
 
         workers = max(1, min(int(max_concurrent_files), 20))
@@ -783,6 +790,7 @@ class YesAPIImageBatchDir(_YesAPIImageNodeBase):
             "✅ 文件夹批量完成" if not abort_event.is_set() else f"❌ 任务中断 ({abort_reason})",
             f"📁 输入目录: {os.path.basename(clean_dir)} ({len(image_files)} 个文件)",
             f"📄 提示词源: {source_mode} ({len(base_prompts)} 条 x {executions_per_prompt} 次)",
+            f"📐 尺寸设置: 比例={aspect_ratio}, 分辨率={resolution} ({final_size or 'auto'})",
             f"🖼️ 成功: {total_success_imgs}",
             f"❌ 失败: {len(failed_records)}",
             f"💾 输出目录: {batch_output_dir}",
