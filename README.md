@@ -24,7 +24,7 @@
 
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/your-username/ComfyUI-YesAPI.git
+git clone https://github.com/wsmdbud/ComfyUI-YesAPI.git
 cd ComfyUI-YesAPI
 pip install -r requirements.txt
 ```

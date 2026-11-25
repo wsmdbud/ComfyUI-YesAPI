@@ -15,10 +15,10 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/your-username/ComfyUI-YesAPI"
+Repository = "https://github.com/wsmdbud/ComfyUI-YesAPI"
 
 [tool.comfy]
-PublisherId = "yesapi-community"
+PublisherId = "wsmdbud"
 DisplayName = "ComfyUI-YesAPI"
 Icon = ""
 
